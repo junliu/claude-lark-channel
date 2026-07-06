@@ -1,5 +1,7 @@
 # Lark channel for Claude Code
 
+> 🌐 **English** · [中文](./README.zh-CN.md)
+
 A self-built **[Channel](https://code.claude.com/docs/en/channels.md)** plugin that lets you drive
 Claude Code from **Lark (Larksuite international, `open.larksuite.com`)** and receive its replies —
 the same way the official Telegram / Discord channel plugins work. Anthropic ships Telegram, Discord,
