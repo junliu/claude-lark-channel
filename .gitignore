@@ -1,0 +1,15 @@
+# Secrets & runtime state — NEVER commit these.
+# .env holds LARK_APP_SECRET; access.json holds the sender allowlist.
+# When LARK_CONFIG_DIR points into this repo, these files land here — keep them out of git.
+.env
+access.json
+**/.env
+**/access.json
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Editor / OS
+.DS_Store
+*.log

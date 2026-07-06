@@ -1,0 +1,25 @@
+{
+  "name": "claude-lark-channel",
+  "version": "0.1.0",
+  "description": "Lark (Larksuite international) channel plugin for Claude Code — two-way bot messaging with allowlist, pairing, and permission relay.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node --experimental-strip-types server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@larksuiteoapi/node-sdk": "^1.68.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "express": "^5.2.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=22.6.0"
+  }
+}

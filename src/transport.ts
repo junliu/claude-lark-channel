@@ -1,0 +1,79 @@
+// Transport abstraction: both webhook and ws implementations normalize the
+// im.message.receive_v1 event into a LarkInboundMessage and invoke onMessage.
+import * as lark from '@larksuiteoapi/node-sdk';
+import { log, type LarkInboundMessage } from './config.ts';
+
+export type OnMessage = (msg: LarkInboundMessage) => Promise<void>;
+
+export interface LarkTransport {
+  start(onMessage: OnMessage): Promise<void>;
+}
+
+// The SDK flattens header+event, so the handler receives `sender` and `message` at the top level.
+// Shape mirrors the SDK's im.message.receive_v1 handler type.
+interface ReceiveEventData {
+  sender: { sender_id?: { open_id?: string; union_id?: string; user_id?: string } };
+  message: {
+    message_id: string;
+    chat_id: string;
+    chat_type: string;
+    message_type: string;
+    content: string;
+    mentions?: Array<{ name?: string }>;
+  };
+}
+
+// Extract plain text from a message. Lark `content` is a JSON-encoded STRING that must be
+// re-parsed. Text messages carry { text }. Rich 'post' and other types are best-effort.
+function extractText(messageType: string, content: string): string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    return content;
+  }
+  const obj = parsed as Record<string, unknown>;
+  if (messageType === 'text' && typeof obj.text === 'string') {
+    // Lark encodes @mentions as @_user_1 placeholders in text; strip them for clarity.
+    return obj.text.replace(/@_user_\d+/g, '').trim();
+  }
+  if (typeof obj.text === 'string') return obj.text;
+  // Fall back to the raw JSON so nothing is silently dropped for unsupported types.
+  return content;
+}
+
+// Build the EventDispatcher shared by both transports.
+// For webhook, encryptKey/verificationToken enable decryption + signature verification.
+// For ws they are unused (events arrive as plaintext over the authed connection).
+export function buildDispatcher(
+  onMessage: OnMessage,
+  opts: { encryptKey?: string; verificationToken?: string },
+): lark.EventDispatcher {
+  const dispatcher = new lark.EventDispatcher({
+    encryptKey: opts.encryptKey,
+    verificationToken: opts.verificationToken,
+  }).register({
+    'im.message.receive_v1': async (raw: unknown) => {
+      const data = raw as ReceiveEventData;
+      const message = data.message;
+      const senderOpenId = data.sender?.sender_id?.open_id ?? '';
+      const text = extractText(message.message_type, message.content);
+      const senderName = data.message.mentions?.[0]?.name;
+      const msg: LarkInboundMessage = {
+        messageId: message.message_id,
+        chatId: message.chat_id,
+        chatType: message.chat_type,
+        senderOpenId,
+        senderName,
+        text,
+      };
+      try {
+        await onMessage(msg);
+      } catch (err) {
+        log('onMessage handler error:', (err as Error)?.message);
+      }
+      return { code: 0 };
+    },
+  });
+  return dispatcher;
+}
