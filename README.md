@@ -26,18 +26,47 @@ and iMessage channels, but not Lark; this fills that gap.
 
 ## Install
 
+This repo is **both a plugin and a one-plugin marketplace** — adding the repo lets you install with
+one command.
+
 ```bash
-cd claude-lark-channel
+# 1. add this repo as a marketplace, then install the plugin
+claude plugin marketplace add junliu/claude-lark-channel
+claude plugin install lark@claude-lark-channel
+
+# 2. install the MCP server's runtime dependencies (REQUIRED — not automatic)
+#    the install step prints the plugin path; cd there and run npm install:
+cd ~/.claude/plugins/<...>/claude-lark-channel   # path shown by the install command
 npm install
 ```
 
-Then load it as a plugin (dev):
+> ⚠️ **You MUST run `npm install` in the plugin dir.** Claude Code does **not** auto-install npm
+> dependencies. Without it the server fails with "Cannot find package '@larksuiteoapi/node-sdk'".
+> Requires **Node ≥ 22.6**.
+
+### Local / dev install (without the marketplace)
 
 ```bash
-claude --plugin-dir ./claude-lark-channel
-# validate structure:
-claude plugin validate ./claude-lark-channel
+git clone https://github.com/junliu/claude-lark-channel
+cd claude-lark-channel && npm install
+claude --plugin-dir ./claude-lark-channel     # load for this session
+claude plugin validate ./claude-lark-channel  # optional: validate structure
 ```
+
+### ⚠️ Enable the channel at launch (required, both install methods)
+
+Channels are an experimental feature and this plugin is **not on Anthropic's built-in allowlist**, so
+you must pass a dev flag when starting Claude Code — otherwise the bot receives messages but never
+replies (they're silently dropped):
+
+```bash
+claude --dangerously-load-development-channels plugin:lark@claude-lark-channel
+```
+
+For a `--plugin-dir` dev load, the tag is `plugin:lark@<the marketplace/dir name>` (e.g.
+`plugin:lark@inline` for a local dir load). On startup, a dim line under the banner —
+`Channels (experimental) messages from plugin:lark inject directly in this session` — confirms it
+registered. Consider wrapping this in a shell alias/function so you don't retype it.
 
 ## Lark app setup (one-time, in the Developer Console)
 

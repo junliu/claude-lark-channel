@@ -1,0 +1,22 @@
+{
+  "$schema": "https://raw.githubusercontent.com/anthropics/claude-code/main/schemas/marketplace.json",
+  "name": "claude-lark-channel",
+  "description": "Lark (Larksuite international) channel for Claude Code — DM a bot to drive Claude Code, with allowlist, pairing, and permission relay.",
+  "owner": {
+    "name": "Jun Liu"
+  },
+  "plugins": [
+    {
+      "name": "lark",
+      "version": "0.1.0",
+      "description": "Lark channel for Claude Code with allowlist access control, pairing, and permission relay.",
+      "source": "./",
+      "author": {
+        "name": "Jun Liu"
+      },
+      "category": "integration",
+      "homepage": "https://github.com/junliu/claude-lark-channel",
+      "keywords": ["lark", "larksuite", "feishu", "channel", "bot", "mcp"]
+    }
+  ]
+}
