@@ -1,8 +1,9 @@
 // The gate decides what happens to each inbound Lark message, in order:
 //   1. dedup by message_id (Lark may push duplicates)
-//   2. allowlist check on SENDER open_id (pairing offered to strangers)
-//   3. permission reply "yes/no <id>" interception
-//   4. otherwise, forward to Claude as a channel message
+//   2. GROUP messages: require the bot to be @mentioned, else drop silently
+//   3. allowlist check on SENDER open_id (pairing offered to strangers in p2p only)
+//   4. permission reply "yes/no <id>" interception
+//   5. otherwise, forward to Claude as a channel message
 import { log, type LarkInboundMessage } from './config.ts';
 import { AccessStore } from './access.ts';
 import { LarkClient } from './lark-client.ts';
@@ -47,9 +48,26 @@ export function makeGate(deps: {
       return;
     }
 
-    // 2. allowlist (by sender open_id — NOT chat_id)
+    // 2. GROUP chats: only act when THIS bot is @mentioned; otherwise stay silent so the bot
+    //    doesn't react to ordinary group chatter. (p2p/DMs skip this and behave as before.)
+    const isGroup = msg.chatType === 'group';
+    if (isGroup) {
+      const botOpenId = await deps.lark.getBotOpenId();
+      const mentionsBot = !!botOpenId && msg.mentions.some((m) => m.openId === botOpenId);
+      if (!mentionsBot) {
+        // Not @'d (or we couldn't resolve the bot id) — ignore quietly.
+        return;
+      }
+    }
+
+    // 3. allowlist (by sender open_id — NOT chat_id). Pairing is offered ONLY in p2p; in a group
+    //    we stay silent for unauthorized senders (no pairing-code spam in shared channels).
     if (!deps.access.isAllowed(msg.senderOpenId)) {
-      // Offer pairing to strangers (both explicit "pair" and any first contact).
+      if (isGroup) {
+        log('group @mention from non-allowlisted sender, ignoring:', msg.senderOpenId);
+        return;
+      }
+      // p2p: offer pairing to strangers (both explicit "pair" and any first contact).
       const code = deps.access.createPairingCode(
         msg.senderOpenId,
         msg.chatId,
@@ -68,7 +86,7 @@ export function makeGate(deps: {
       return;
     }
 
-    // 3. permission decision interception
+    // 4. permission decision interception
     const decision = parsePermissionReply(msg.text);
     if (decision) {
       await deps.channel.relayPermissionDecision(decision);
@@ -76,7 +94,7 @@ export function makeGate(deps: {
       return;
     }
 
-    // 4. normal message → Claude
+    // 5. normal message → Claude
     await deps.channel.pushMessage(msg.text, {
       chat_id: msg.chatId,
       message_id: msg.messageId,

@@ -15,8 +15,11 @@ and iMessage channels, but not Lark; this fills that gap.
 
 - **Two-way messaging** — DM the bot; the message arrives in Claude Code as a `<channel>` event, and
   Claude replies back via the `reply` tool.
+- **Group chat support** — add the bot to a group. In groups it **only** responds to messages that
+  **@mention the bot** (ordinary group chatter is ignored); DMs need no @mention.
 - **Access control** — allowlist keyed on the **sender's open_id** (not chat), with a pairing flow
-  for onboarding new users.
+  for onboarding new users. In groups, the sender must also be on the allowlist AND @mention the
+  bot; unauthorized senders are ignored silently (no pairing-code spam in shared channels).
 - **Permission relay** — approve Claude's tool calls from Lark by replying `yes <id>` / `no <id>`.
 - **Switchable transport** — Webhook (default, always works) or WebSocket long connection (optional,
   no public URL — if your Larksuite console exposes it).
@@ -74,9 +77,13 @@ registered. Consider wrapping this in a shell alias/function so you don't retype
 
 1. https://open.larksuite.com/app → **Create custom app** → note **App ID** (`cli_...`) & **App Secret**.
 2. **Add features → Bot** → enable.
-3. **Permissions / Scopes** (minimum for DMs): `im:message.p2p_msg:readonly` + `im:message:send_as_bot`.
-   Add `im:message.group_at_msg:readonly` for group @mentions.
+3. **Permissions / Scopes**:
+   - DMs (minimum): `im:message.p2p_msg:readonly` + `im:message:send_as_bot`.
+   - **Group chat**: also add **`im:message.group_at_msg:readonly`** — this makes Lark push only
+     the group messages that **@mention the bot** (exactly what the group flow needs; do NOT use the
+     broader `im:message.group_msg:readonly`, which fires on every group message).
 4. **Events & Callbacks** → subscribe to `im.message.receive_v1`.
+   - For group use, also **add the bot to the group** in Lark, then @mention it.
    - **Webhook (default):** Request URL = `https://<your-public-host>/webhook/event`; set an
      **Encrypt Key** and **Verification Token**.
    - **WS (optional):** if the console offers a "long connection" subscription mode, you can use it
@@ -160,6 +167,11 @@ LARK_APP_ID=cli_xxx LARK_APP_SECRET=xxx npm start
    back into Lark.
 4. When Claude asks to run a tool, the bot forwards a permission prompt; reply `yes <id>` or
    `no <id>` from Lark to allow/deny.
+
+**In a group chat:** add the bot to the group, then **@mention the bot** in your message — only
+@mentioned messages reach Claude (plain group chatter is ignored). The sender must still be on the
+allowlist; pair first via a DM (groups never show pairing codes). The bot's own @mention is stripped
+before the text reaches Claude.
 
 Manage access anytime: `/lark:access list | pair <code> | allow <open_id> | policy <allowlist|public>`.
 See [ACCESS.md](./ACCESS.md).

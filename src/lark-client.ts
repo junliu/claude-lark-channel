@@ -5,6 +5,7 @@ import { log, type LarkConfig } from './config.ts';
 
 export class LarkClient {
   private client: lark.Client;
+  private botOpenId: string | null = null; // cached; the bot's own open_id never changes
 
   constructor(cfg: LarkConfig) {
     this.client = new lark.Client({
@@ -19,6 +20,29 @@ export class LarkClient {
   // Expose the raw SDK client in case transports need EventDispatcher wiring, etc.
   get raw(): lark.Client {
     return this.client;
+  }
+
+  // The bot's own open_id (ou_...), fetched once from GET /open-apis/bot/v3/info and cached.
+  // Used to decide whether a group message actually @mentioned THIS bot. Returns null if the
+  // lookup fails (caller should treat "unknown bot id" as "cannot confirm @bot").
+  async getBotOpenId(): Promise<string | null> {
+    if (this.botOpenId) return this.botOpenId;
+    try {
+      // The SDK auto-attaches a tenant_access_token to this authenticated request.
+      const res = (await this.client.request({
+        url: '/open-apis/bot/v3/info',
+        method: 'GET',
+      })) as { bot?: { open_id?: string } };
+      const openId = res?.bot?.open_id;
+      if (openId) {
+        this.botOpenId = openId;
+        return openId;
+      }
+      log('bot/v3/info returned no open_id:', JSON.stringify(res).slice(0, 200));
+    } catch (err) {
+      log('failed to fetch bot open_id:', (err as Error)?.message);
+    }
+    return null;
   }
 
   // Reply to a specific incoming message (preferred for a conversational bot).

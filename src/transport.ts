@@ -1,7 +1,7 @@
 // Transport abstraction: both webhook and ws implementations normalize the
 // im.message.receive_v1 event into a LarkInboundMessage and invoke onMessage.
 import * as lark from '@larksuiteoapi/node-sdk';
-import { log, type LarkInboundMessage } from './config.ts';
+import { log, type LarkInboundMessage, type LarkMention } from './config.ts';
 
 export type OnMessage = (msg: LarkInboundMessage) => Promise<void>;
 
@@ -19,7 +19,12 @@ interface ReceiveEventData {
     chat_type: string;
     message_type: string;
     content: string;
-    mentions?: Array<{ name?: string }>;
+    // In group chats, each @mention (users AND the bot) appears here with its open_id.
+    mentions?: Array<{
+      key?: string;
+      id?: { open_id?: string; union_id?: string; user_id?: string };
+      name?: string;
+    }>;
   };
 }
 
@@ -58,14 +63,18 @@ export function buildDispatcher(
       const message = data.message;
       const senderOpenId = data.sender?.sender_id?.open_id ?? '';
       const text = extractText(message.message_type, message.content);
-      const senderName = data.message.mentions?.[0]?.name;
+      // Parse every @mention with its open_id so the gate can tell if the bot was @'d.
+      const mentions: LarkMention[] = (message.mentions ?? [])
+        .map((m) => ({ key: m.key ?? '', openId: m.id?.open_id ?? '', name: m.name }))
+        .filter((m) => m.openId);
       const msg: LarkInboundMessage = {
         messageId: message.message_id,
         chatId: message.chat_id,
         chatType: message.chat_type,
         senderOpenId,
-        senderName,
+        senderName: undefined,
         text,
+        mentions,
       };
       try {
         await onMessage(msg);

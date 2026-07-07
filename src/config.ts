@@ -78,6 +78,13 @@ export function loadConfig(): LarkConfig {
   };
 }
 
+// A single @mention parsed from a Lark message.
+export interface LarkMention {
+  key: string; // "@_user_N" placeholder in the raw text
+  openId: string; // ou_... of the mentioned user/bot
+  name?: string;
+}
+
 // Normalized inbound message handed from a transport to the gate.
 export interface LarkInboundMessage {
   messageId: string; // om_...
@@ -85,7 +92,8 @@ export interface LarkInboundMessage {
   chatType: 'p2p' | 'group' | string;
   senderOpenId: string; // ou_...
   senderName?: string;
-  text: string; // already extracted from JSON content
+  text: string; // already extracted from JSON content (with @_user_N placeholders stripped)
+  mentions: LarkMention[]; // everyone @mentioned in this message (empty if none)
 }
 
 // stderr is safe for logging in a stdio MCP server (stdout is the JSON-RPC channel).

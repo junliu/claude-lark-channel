@@ -15,8 +15,11 @@ Lark，本插件补上这个空缺。
 
 - **双向消息** —— 私聊机器人，消息会作为 `<channel>` 事件到达 Claude Code，Claude 通过 `reply`
   工具回复回去。
+- **群聊支持** —— 把机器人拉进群。在群里它**只**响应 **@机器人** 的消息（普通群聊消息一律忽略）；
+  单聊则无需 @。
 - **访问控制** —— 基于**发送者 open_id**（而非会话）的允许列表（allowlist），并带有配对
-  （pairing）流程供新用户接入。
+  （pairing）流程供新用户接入。群里还要求：发言人既在 allowlist 里、又 @了机器人才生效；未授权的人
+  @机器人会被静默忽略（不会在群里刷配对码）。
 - **权限中继** —— Claude 要调用工具时，可在 Lark 里回复 `yes <id>` / `no <id>` 来批准/拒绝。
 - **可切换传输方式** —— Webhook（默认，始终可用）或 WebSocket 长连接（可选，无需公网 URL —— 前提是
   你的 Larksuite 后台开放了该模式）。
@@ -71,9 +74,12 @@ claude --dangerously-load-development-channels plugin:lark@claude-lark-channel
 
 1. https://open.larksuite.com/app → **创建自建应用** → 记下 **App ID**（`cli_...`）和 **App Secret**。
 2. **添加应用能力 → 机器人（Bot）** → 启用。
-3. **权限 / Scopes**（私聊最小集）：`im:message.p2p_msg:readonly` + `im:message:send_as_bot`。
-   需要群内 @机器人 则再加 `im:message.group_at_msg:readonly`。
+3. **权限 / Scopes**：
+   - 私聊（最小集）：`im:message.p2p_msg:readonly` + `im:message:send_as_bot`。
+   - **群聊**：再加 **`im:message.group_at_msg:readonly`** —— 它让 Lark 只推送**@了机器人**的群消息
+     （正好是群聊流程需要的；不要用范围更大的 `im:message.group_msg:readonly`，那会推送每一条群消息）。
 4. **事件与回调** → 订阅 `im.message.receive_v1`。
+   - 群聊场景还需**把机器人拉进群**，然后 @它。
    - **Webhook（默认）：** Request URL = `https://<你的公网地址>/webhook/event`；设置 **Encrypt Key**
      和 **Verification Token**。
    - **WS（可选）：** 如果后台提供了「长连接」订阅模式，可以用它代替公网 URL（见下方注意事项）。
@@ -153,6 +159,10 @@ LARK_APP_ID=cli_xxx LARK_APP_SECRET=xxx npm start
    里，Claude 会把回复发回 Lark。
 4. 当 Claude 请求运行某个工具时，机器人会转发一条权限提示；在 Lark 里回复 `yes <id>` 或 `no <id>`
    即可批准/拒绝。
+
+**在群聊里：** 把机器人拉进群，然后在消息里 **@机器人** —— 只有 @了机器人的消息才会到达 Claude
+（普通群聊消息一律忽略）。发言人仍必须在 allowlist 里；请先通过**单聊**完成配对（群里不会显示配对码）。
+到达 Claude 前，@机器人的占位符会被自动去掉。
 
 随时管理访问权限：`/lark:access list | pair <code> | allow <open_id> | policy <allowlist|public>`。
 详见 [ACCESS.md](./ACCESS.md)。
