@@ -1,6 +1,6 @@
 {
   "name": "lark",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Lark (Larksuite international) channel for Claude Code. DM a Lark bot to drive Claude Code and receive its replies, with allowlist access control, pairing, and permission relay.",
   "author": {
     "name": "Jun Liu",

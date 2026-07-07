@@ -70,6 +70,30 @@ claude --dangerously-load-development-channels plugin:lark@claude-lark-channel
 `Channels (experimental) messages from plugin:lark inject directly in this session`，看到它就说明
 注册成功。建议把这条命令封装成 shell 别名/函数，免得每次重敲。
 
+## 更新插件
+
+有新版本发布后，这样拉取更新：
+
+```bash
+/plugin marketplace update claude-lark-channel   # 刷新 marketplace 列表
+/plugin update lark@claude-lark-channel          # 更新插件
+```
+
+然后：
+
+1. **如果依赖变了，重新跑 `npm install`** —— 更新**不会**自动装依赖：
+   ```bash
+   cd ~/.claude/plugins/cache/claude-lark-channel/lark/<version>/   # 路径以 /plugin 显示为准
+   npm install
+   ```
+2. **重启 Claude Code**（带上你的 channel 标志），让新的 MCP 服务器代码和 instructions 生效。
+   `/reload-plugins` 只处理插件启用/禁用，不会重载 MCP 服务器的代码改动。
+
+> **给发布新版本的维护者：** 必须**同时**在 `.claude-plugin/plugin.json` 和
+> `.claude-plugin/marketplace.json` 里对应的插件条目中 bump `version`（两者必须一致）—— Claude Code
+> 靠 `version` 判断有没有更新，只推 commit 而不改版本号，用户会看到"没有更新"。改完 `git push`，可选
+> 打 tag：`git tag lark--v<version> && git push --tags`。
+
 ## Lark 应用配置（一次性，在开发者后台完成）
 
 1. https://open.larksuite.com/app → **创建自建应用** → 记下 **App ID**（`cli_...`）和 **App Secret**。

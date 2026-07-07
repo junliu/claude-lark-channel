@@ -73,6 +73,30 @@ For a `--plugin-dir` dev load, the tag is `plugin:lark@<the marketplace/dir name
 `Channels (experimental) messages from plugin:lark inject directly in this session` — confirms it
 registered. Consider wrapping this in a shell alias/function so you don't retype it.
 
+## Updating
+
+To pull a newer version after it's published:
+
+```bash
+/plugin marketplace update claude-lark-channel   # refresh the marketplace listing
+/plugin update lark@claude-lark-channel          # update the plugin
+```
+
+Then:
+
+1. **Re-run `npm install`** if dependencies changed — updates do **not** auto-install:
+   ```bash
+   cd ~/.claude/plugins/cache/claude-lark-channel/lark/<version>/   # path shown by /plugin
+   npm install
+   ```
+2. **Restart Claude Code** (with your channel flag) so the new MCP server code and instructions load.
+   `/reload-plugins` only covers enable/disable, not MCP server code changes.
+
+> **For maintainers publishing a release:** bump `version` in **both** `.claude-plugin/plugin.json`
+> and the plugin's entry in `.claude-plugin/marketplace.json` (they must match) — Claude Code uses
+> `version` to detect updates, so pushing commits without bumping it means users see "no update".
+> Then `git push`, and optionally tag: `git tag lark--v<version> && git push --tags`.
+
 ## Lark app setup (one-time, in the Developer Console)
 
 1. https://open.larksuite.com/app → **Create custom app** → note **App ID** (`cli_...`) & **App Secret**.
