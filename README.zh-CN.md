@@ -164,6 +164,10 @@ LARK_APP_ID=cli_xxx LARK_APP_SECRET=xxx npm start
 （普通群聊消息一律忽略）。发言人仍必须在 allowlist 里；请先通过**单聊**完成配对（群里不会显示配对码）。
 到达 Claude 前，@机器人的占位符会被自动去掉。
 
+**在飞书里开启新对话：** 发送**恰好为 `新会话`** 的消息。Claude 会忽略该会话之前的上下文，把你的下一条
+消息当作全新任务。注意这是**软重置** —— channel 无法执行 `/new` 或 `/compact`，所以它并不真正缩减底层
+上下文（只是让 Claude 忽略它）。要真正压缩，请在终端里运行 `/compact`。
+
 随时管理访问权限：`/lark:access list | pair <code> | allow <open_id> | policy <allowlist|public>`。
 详见 [ACCESS.md](./ACCESS.md)。
 

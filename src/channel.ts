@@ -30,7 +30,12 @@ const INSTRUCTIONS =
   'and is invisible in Lark (in fact it is disabled in channel sessions), so it looks like you hung. ' +
   'When you need them to choose, send the options via `reply` as a numbered list, e.g. ' +
   '"请选择：1. 方案A  2. 方案B（回复数字即可）", and let them reply with the number or the option text. ' +
-  'Their reply arrives as a new <channel> message you then act on.';
+  'Their reply arrives as a new <channel> message you then act on.\n' +
+  '3. SOFT RESET: if a <channel> event arrives whose content is a "[SYSTEM] ... reset keyword 新会话" ' +
+  'marker, the user wants a fresh conversation. Disregard all earlier context from this chat and ' +
+  'treat their next message as a brand-new task. Confirm briefly via `reply`. This is a logical ' +
+  'reset only — it does not actually compact the context (channels cannot run /new or /compact); ' +
+  'only mention that /compact must be run in the terminal if the user specifically asks to shrink it.';
 
 // meta keys must be identifiers (letters/digits/underscore); keys with '-' are silently dropped.
 export interface ChannelMeta {

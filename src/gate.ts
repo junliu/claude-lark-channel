@@ -3,7 +3,8 @@
 //   2. GROUP messages: require the bot to be @mentioned, else drop silently
 //   3. allowlist check on SENDER open_id (pairing offered to strangers in p2p only)
 //   4. permission reply "yes/no <id>" interception
-//   5. otherwise, forward to Claude as a channel message
+//   5. soft-reset keyword "新会话" → inject a fresh-start marker
+//   6. otherwise, forward to Claude as a channel message
 import { log, type LarkInboundMessage } from './config.ts';
 import { AccessStore } from './access.ts';
 import { LarkClient } from './lark-client.ts';
@@ -32,6 +33,13 @@ class DedupSet {
 
 // Recognizes an explicit pairing request: "pair" or "pair CODE" (code ignored here).
 const PAIR_RE = /^\s*pair\b/i;
+
+// Soft-reset trigger: when a user sends exactly this (case/space-insensitive), we inject a system
+// marker telling Claude to disregard prior context and start fresh. NOTE: this is a SOFT reset —
+// channels cannot invoke the real /new or /compact (see channels-reference: no session-control
+// notifications), so the underlying context isn't actually cleared/compacted; Claude is just
+// instructed to ignore it. In a group the bot's @mention is already stripped from msg.text.
+const SOFT_RESET_RE = /^\s*新会话\s*$/;
 
 export function makeGate(deps: {
   access: AccessStore;
@@ -94,7 +102,24 @@ export function makeGate(deps: {
       return;
     }
 
-    // 5. normal message → Claude
+    // 5. soft reset — inject a system marker so Claude starts a fresh logical conversation.
+    //    (A soft reset: it does NOT run /new or /compact — channels can't — it just tells Claude
+    //    to ignore prior context. See SOFT_RESET_RE above.)
+    if (SOFT_RESET_RE.test(msg.text)) {
+      log('soft-reset requested by', msg.senderOpenId);
+      await deps.channel.pushMessage(
+        '[SYSTEM] The Lark user sent the reset keyword "新会话". Treat this as the start of a ' +
+          'brand-new conversation: disregard all earlier messages and context from this chat, and ' +
+          'wait for their next message as a fresh task. Reply via the reply tool with a short ' +
+          'confirmation like "已开启新会话，之前的上下文我不再参考，请说你的新任务。" (Note: this is a ' +
+          'logical reset only; it does not compact the underlying context — mention that /compact in ' +
+          'the terminal is the way to actually shrink it, only if the user asks.)',
+        { chat_id: msg.chatId, message_id: msg.messageId, sender_name: msg.senderName },
+      );
+      return;
+    }
+
+    // 6. normal message → Claude
     await deps.channel.pushMessage(msg.text, {
       chat_id: msg.chatId,
       message_id: msg.messageId,

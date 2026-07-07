@@ -173,6 +173,11 @@ LARK_APP_ID=cli_xxx LARK_APP_SECRET=xxx npm start
 allowlist; pair first via a DM (groups never show pairing codes). The bot's own @mention is stripped
 before the text reaches Claude.
 
+**Start a fresh conversation from Lark:** send exactly **`新会话`**. Claude then disregards the
+earlier context in that chat and treats your next message as a brand-new task. Note this is a *soft*
+reset — channels can't run `/new` or `/compact`, so it does not actually shrink the underlying
+context (it only tells Claude to ignore it). To truly compact, run `/compact` in the terminal.
+
 Manage access anytime: `/lark:access list | pair <code> | allow <open_id> | policy <allowlist|public>`.
 See [ACCESS.md](./ACCESS.md).
 
