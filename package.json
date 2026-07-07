@@ -1,6 +1,6 @@
 {
   "name": "claude-lark-channel",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Lark (Larksuite international) channel plugin for Claude Code — two-way bot messaging with allowlist, pairing, and permission relay.",
   "type": "module",
   "private": true,

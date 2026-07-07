@@ -14,7 +14,9 @@ and iMessage channels, but not Lark; this fills that gap.
 ## Features
 
 - **Two-way messaging** — DM the bot; the message arrives in Claude Code as a `<channel>` event, and
-  Claude replies back via the `reply` tool.
+  Claude replies back via the `reply` tool. Replies render **Markdown** by default (headings, bold,
+  lists, `code`, code fences, links, tables) as a Feishu card, falling back to plain text if a reply
+  is too large for a card.
 - **Group chat support** — add the bot to a group. In groups it **only** responds to messages that
   **@mention the bot** (ordinary group chatter is ignored); DMs need no @mention.
 - **Access control** — allowlist keyed on the **sender's open_id** (not chat), with a pairing flow

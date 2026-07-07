@@ -7,7 +7,7 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { log } from './config.ts';
-import { LarkClient } from './lark-client.ts';
+import { LarkClient, type MsgFormat } from './lark-client.ts';
 import {
   PermissionRequestSchema,
   formatPermissionPrompt,
@@ -25,7 +25,9 @@ const INSTRUCTIONS =
   '1. SELF-CONTAINED REPLIES: make each `reply` stand on its own. Include the actual result, any ' +
   'caveats, and any follow-up question or confirmation you\'d otherwise only put in the TUI. Do not ' +
   'assume they can see your terminal output. Be concise in wording, but never drop information they ' +
-  'need to act — a truncated reply that hides the real answer is worse than a longer one.\n' +
+  'need to act — a truncated reply that hides the real answer is worse than a longer one. `reply` ' +
+  'renders Markdown by default, so use headings, **bold**, `code`, code fences, and numbered lists ' +
+  'to make replies readable (pass format:"text" only when you deliberately want no rendering).\n' +
   '2. NEVER use the AskUserQuestion tool when responding to a Lark user — it renders only in the TUI ' +
   'and is invisible in Lark (in fact it is disabled in channel sessions), so it looks like you hung. ' +
   'When you need them to choose, send the options via `reply` as a numbered list, e.g. ' +
@@ -102,7 +104,9 @@ export class LarkChannelServer {
       tools: [
         {
           name: 'reply',
-          description: 'Send a text message back over the Lark channel.',
+          description:
+            'Send a message back over the Lark channel. Text is rendered as Markdown by default ' +
+            '(headings, **bold**, lists, `code`, code blocks, links, tables all render in Lark).',
           inputSchema: {
             type: 'object',
             properties: {
@@ -115,7 +119,19 @@ export class LarkChannelServer {
                 description:
                   'Optional: reply threaded to this specific incoming message (om_...).',
               },
-              text: { type: 'string', description: 'The message text to send.' },
+              text: {
+                type: 'string',
+                description:
+                  'The message text. Markdown is supported and rendered by default — use it ' +
+                  '(headings, bold, lists, code fences) for readable replies.',
+              },
+              format: {
+                type: 'string',
+                enum: ['markdown', 'text'],
+                description:
+                  "How to render `text`. 'markdown' (default) renders as a Feishu card; 'text' " +
+                  'sends a raw plain string. Use text only when you specifically want no rendering.',
+              },
             },
             required: ['chat_id', 'text'],
           },
@@ -131,12 +147,15 @@ export class LarkChannelServer {
         chat_id?: string;
         message_id?: string;
         text?: string;
+        format?: string;
       };
       if (!args.chat_id || !args.text) {
         throw new Error('reply requires chat_id and text');
       }
+      // Default to markdown so replies render nicely; only 'text' opts out.
+      const format: MsgFormat = args.format === 'text' ? 'text' : 'markdown';
       try {
-        await this.lark.sendReplyOrChat(args.chat_id, args.text, args.message_id);
+        await this.lark.sendReplyOrChat(args.chat_id, args.text, args.message_id, format);
         return { content: [{ type: 'text', text: 'sent' }] };
       } catch (err) {
         const msg = (err as Error)?.message ?? String(err);

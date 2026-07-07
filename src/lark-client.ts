@@ -3,6 +3,13 @@
 import * as lark from '@larksuiteoapi/node-sdk';
 import { log, type LarkConfig } from './config.ts';
 
+// 'text' = plain string (no markdown rendering); 'markdown' = Feishu interactive card.
+export type MsgFormat = 'text' | 'markdown';
+
+// Interactive-card payloads are capped at ~30KB by Lark; stay under it with margin, else
+// fall back to plain text so long messages still deliver.
+const CARD_MAX_BYTES = 25 * 1024;
+
 export class LarkClient {
   private client: lark.Client;
   private botOpenId: string | null = null; // cached; the bot's own open_id never changes
@@ -45,33 +52,58 @@ export class LarkClient {
     return null;
   }
 
+  // Build the { msg_type, content } payload for a message. 'markdown' renders as a Feishu
+  // interactive card (headers/lists/code blocks/bold all render); 'text' is a plain string.
+  // Interactive cards have a ~30KB payload cap — oversized markdown falls back to plain text so
+  // the message still gets delivered (unrendered) rather than erroring out.
+  private buildPayload(text: string, format: MsgFormat): { msg_type: string; content: string } {
+    if (format === 'markdown') {
+      const card = {
+        schema: '2.0',
+        // No header — a title bar on every reply would be noise for a chat bot.
+        body: { elements: [{ tag: 'markdown', content: text }] },
+      };
+      const content = JSON.stringify(card);
+      if (content.length <= CARD_MAX_BYTES) {
+        return { msg_type: 'interactive', content };
+      }
+      log(`markdown card ${content.length}B exceeds ${CARD_MAX_BYTES}B cap, sending as text`);
+    }
+    return { msg_type: 'text', content: JSON.stringify({ text }) };
+  }
+
   // Reply to a specific incoming message (preferred for a conversational bot).
-  async replyToMessage(messageId: string, text: string): Promise<void> {
+  async replyToMessage(messageId: string, text: string, format: MsgFormat = 'text'): Promise<void> {
     await this.client.im.message.reply({
       path: { message_id: messageId },
-      data: { msg_type: 'text', content: JSON.stringify({ text }) },
+      data: this.buildPayload(text, format),
     });
   }
 
   // Send a fresh message into a chat by chat_id.
-  async sendToChat(chatId: string, text: string): Promise<void> {
+  async sendToChat(chatId: string, text: string, format: MsgFormat = 'text'): Promise<void> {
     await this.client.im.message.create({
       params: { receive_id_type: 'chat_id' },
-      data: { receive_id: chatId, msg_type: 'text', content: JSON.stringify({ text }) },
+      data: { receive_id: chatId, ...this.buildPayload(text, format) },
     });
   }
 
   // Best-effort send that prefers threading off the original message, falling back to a
   // plain chat send. Used by the permission relay and pairing replies.
-  async sendReplyOrChat(chatId: string, text: string, messageId?: string): Promise<void> {
+  async sendReplyOrChat(
+    chatId: string,
+    text: string,
+    messageId?: string,
+    format: MsgFormat = 'text',
+  ): Promise<void> {
     try {
       if (messageId) {
-        await this.replyToMessage(messageId, text);
+        await this.replyToMessage(messageId, text, format);
         return;
       }
     } catch (err) {
       log('reply failed, falling back to chat send:', (err as Error)?.message);
     }
-    await this.sendToChat(chatId, text);
+    await this.sendToChat(chatId, text, format);
   }
 }
