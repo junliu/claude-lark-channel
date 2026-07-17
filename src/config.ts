@@ -20,6 +20,11 @@ function resolveStateDir(): string {
 export const STATE_DIR = resolveStateDir();
 export const ENV_FILE = join(STATE_DIR, '.env');
 export const ACCESS_FILE = join(STATE_DIR, 'access.json');
+// Inbox dir where inbound images are saved. Follows the fakechat pattern: the notification
+// content is a string path, and Claude reads the file with its own Read tool. Files older than
+// INBOX_MAX_AGE_MS are pruned lazily on each new save.
+export const INBOX_DIR = join(STATE_DIR, 'inbox');
+export const INBOX_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000; // 14 days
 
 // Minimal .env loader (KEY=VALUE lines) — avoids a dotenv dependency.
 // Values already present in process.env win, so `LARK_APP_ID=... node server.ts` overrides the file.
@@ -94,6 +99,10 @@ export interface LarkInboundMessage {
   senderName?: string;
   text: string; // already extracted from JSON content (with @_user_N placeholders stripped)
   mentions: LarkMention[]; // everyone @mentioned in this message (empty if none)
+  // For image messages: the Lark image_key. Downloaded on demand via
+  // im/v1/messages/{message_id}/resources/{image_key}?type=image and pushed to Claude as MCP
+  // image content (base64 + mimeType). Undefined for non-image messages.
+  imageKey?: string;
 }
 
 // stderr is safe for logging in a stdio MCP server (stdout is the JSON-RPC channel).

@@ -119,7 +119,30 @@ export function makeGate(deps: {
       return;
     }
 
-    // 6. normal message → Claude
+    // 6a. image message → download from Lark, save to inbox, push path to Claude.
+    //     On download failure, fall back to a text notice so the user's message isn't fully
+    //     dropped (they'll see the bot didn't process the image and can resend/rephrase).
+    if (msg.imageKey) {
+      try {
+        const bytes = await deps.lark.downloadResource(msg.messageId, msg.imageKey);
+        await deps.channel.pushImage(bytes, msg.text, {
+          chat_id: msg.chatId,
+          message_id: msg.messageId,
+          sender_name: msg.senderName,
+        });
+      } catch (err) {
+        log('image download failed:', (err as Error)?.message);
+        await deps.channel.pushMessage(
+          `[image message received but download failed: ${(err as Error)?.message ?? 'unknown'} — ` +
+            'ask the sender to resend]' +
+            (msg.text ? `\ncaption: ${msg.text}` : ''),
+          { chat_id: msg.chatId, message_id: msg.messageId, sender_name: msg.senderName },
+        );
+      }
+      return;
+    }
+
+    // 6b. normal text message → Claude
     await deps.channel.pushMessage(msg.text, {
       chat_id: msg.chatId,
       message_id: msg.messageId,

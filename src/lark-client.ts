@@ -1,5 +1,6 @@
 // Thin wrapper over the official Lark SDK client for sending / replying as the bot.
 // The SDK handles tenant_access_token acquisition, caching, and refresh internally.
+import { createReadStream } from 'node:fs';
 import * as lark from '@larksuiteoapi/node-sdk';
 import { log, type LarkConfig } from './config.ts';
 
@@ -105,5 +106,79 @@ export class LarkClient {
       log('reply failed, falling back to chat send:', (err as Error)?.message);
     }
     await this.sendToChat(chatId, text, format);
+  }
+
+  // ── image support (v0.4.0) ───────────────────────────────────
+  // Send/receive images through Lark's im/v1/images and messages resources APIs.
+
+  // Upload a local image file → returns Lark's `image_key`, which is then referenced by
+  // subsequent send/reply calls. `message` is the only image_type we use here (10MB cap).
+  async uploadImage(imagePath: string): Promise<string> {
+    const res = await this.client.im.image.create({
+      data: {
+        image_type: 'message',
+        image: createReadStream(imagePath),
+      },
+    });
+    const key = res?.image_key;
+    if (!key) {
+      throw new Error(`upload succeeded but no image_key: ${JSON.stringify(res).slice(0, 200)}`);
+    }
+    return key;
+  }
+
+  // Download an image referenced by an inbound message. Lark requires the source message_id
+  // as URL context (the image_key alone is not resolvable). Returns raw bytes as a Buffer.
+  async downloadResource(messageId: string, fileKey: string): Promise<Buffer> {
+    const res = await this.client.im.messageResource.get({
+      path: { message_id: messageId, file_key: fileKey },
+      params: { type: 'image' },
+    });
+    const stream = res.getReadableStream();
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
+  }
+
+  // Send an image into a chat by chat_id (bare image, no caption).
+  async sendImageToChat(chatId: string, imageKey: string): Promise<void> {
+    await this.client.im.message.create({
+      params: { receive_id_type: 'chat_id' },
+      data: {
+        receive_id: chatId,
+        msg_type: 'image',
+        content: JSON.stringify({ image_key: imageKey }),
+      },
+    });
+  }
+
+  // Reply to a specific incoming message with an image (threaded).
+  async replyImageToMessage(messageId: string, imageKey: string): Promise<void> {
+    await this.client.im.message.reply({
+      path: { message_id: messageId },
+      data: {
+        msg_type: 'image',
+        content: JSON.stringify({ image_key: imageKey }),
+      },
+    });
+  }
+
+  // Best-effort image send — prefer threaded reply, fall back to chat.
+  async sendImageOrReply(
+    chatId: string,
+    imageKey: string,
+    messageId?: string,
+  ): Promise<void> {
+    try {
+      if (messageId) {
+        await this.replyImageToMessage(messageId, imageKey);
+        return;
+      }
+    } catch (err) {
+      log('reply-image failed, falling back to chat send:', (err as Error)?.message);
+    }
+    await this.sendImageToChat(chatId, imageKey);
   }
 }

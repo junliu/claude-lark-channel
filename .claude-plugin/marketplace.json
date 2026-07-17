@@ -8,8 +8,8 @@
   "plugins": [
     {
       "name": "lark",
-      "version": "0.3.0",
-      "description": "Lark channel for Claude Code with allowlist access control, pairing, and permission relay.",
+      "version": "0.4.0",
+      "description": "Lark channel for Claude Code with two-way image support, allowlist access control, pairing, and permission relay.",
       "source": "./",
       "author": {
         "name": "Jun Liu"

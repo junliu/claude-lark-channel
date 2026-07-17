@@ -28,23 +28,39 @@ interface ReceiveEventData {
   };
 }
 
-// Extract plain text from a message. Lark `content` is a JSON-encoded STRING that must be
-// re-parsed. Text messages carry { text }. Rich 'post' and other types are best-effort.
-function extractText(messageType: string, content: string): string {
+// Extract meaningful payload from a Lark message. `content` is a JSON-encoded STRING that must be
+// re-parsed. Handles text, image, and best-effort text on rich 'post' etc. Image messages return
+// { imageKey } so the gate can download the resource; text always populates { text } (possibly the
+// raw JSON as a fallback so nothing is silently dropped for unsupported types).
+interface ExtractedPayload {
+  text: string;
+  imageKey?: string;
+}
+
+function extractPayload(messageType: string, content: string): ExtractedPayload {
   let parsed: unknown;
   try {
     parsed = JSON.parse(content);
   } catch {
-    return content;
+    return { text: content };
   }
   const obj = parsed as Record<string, unknown>;
+
+  if (messageType === 'image' && typeof obj.image_key === 'string') {
+    // Image messages have no accompanying text in content; text stays empty and the gate will
+    // push image content to Claude. Some future variants might add captions — pick up any 'text'
+    // field defensively so it isn't dropped.
+    const caption = typeof obj.text === 'string' ? obj.text : '';
+    return { text: caption, imageKey: obj.image_key };
+  }
+
   if (messageType === 'text' && typeof obj.text === 'string') {
     // Lark encodes @mentions as @_user_1 placeholders in text; strip them for clarity.
-    return obj.text.replace(/@_user_\d+/g, '').trim();
+    return { text: obj.text.replace(/@_user_\d+/g, '').trim() };
   }
-  if (typeof obj.text === 'string') return obj.text;
+  if (typeof obj.text === 'string') return { text: obj.text };
   // Fall back to the raw JSON so nothing is silently dropped for unsupported types.
-  return content;
+  return { text: content };
 }
 
 // Build the EventDispatcher shared by both transports.
@@ -62,7 +78,7 @@ export function buildDispatcher(
       const data = raw as ReceiveEventData;
       const message = data.message;
       const senderOpenId = data.sender?.sender_id?.open_id ?? '';
-      const text = extractText(message.message_type, message.content);
+      const { text, imageKey } = extractPayload(message.message_type, message.content);
       // Parse every @mention with its open_id so the gate can tell if the bot was @'d.
       const mentions: LarkMention[] = (message.mentions ?? [])
         .map((m) => ({ key: m.key ?? '', openId: m.id?.open_id ?? '', name: m.name }))
@@ -75,6 +91,7 @@ export function buildDispatcher(
         senderName: undefined,
         text,
         mentions,
+        imageKey,
       };
       try {
         await onMessage(msg);
